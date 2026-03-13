@@ -198,6 +198,7 @@ export default function App() {
   const [scores, setScores] = useState([]);
   const [pendingWild, setPendingWild] = useState(null); // stores index of wild card clicked
   const [flyingCard, setFlyingCard] = useState(null); // { index, x, y }
+  const [flyingCardData, setFlyingCardData] = useState(null);
   const playSound = useSound();
 
   // ─── API Calls ───────────────────────────────────────────────
@@ -227,21 +228,21 @@ export default function App() {
       return;
     }
 
-    // Get card position for fly animation
-    if (e) {
+    // Save card position before anything else
+    const getCardRect = () => {
+      if (!e) return null;
       const rect = e.currentTarget.getBoundingClientRect();
       const discardEl = document.getElementById('discard-pile');
       const discardRect = discardEl?.getBoundingClientRect();
-      if (discardRect) {
-        setFlyingCard({
-          index: cardIndex,
-          startX: rect.left, startY: rect.top,
-          endX: discardRect.left - rect.left,
-          endY: discardRect.top - rect.top,
-        });
-        setTimeout(() => setFlyingCard(null), 400);
-      }
-    }
+      if (!discardRect) return null;
+      return {
+        startX: rect.left, startY: rect.top,
+        endX: discardRect.left - rect.left,
+        endY: discardRect.top - rect.top,
+      };
+    };
+
+    const cardRect = getCardRect();
 
     playSound('play');
     setLoading(true);
@@ -253,7 +254,21 @@ export default function App() {
     setGame(data);
     setLoading(false);
 
-    // Trigger sounds based on result
+    // Only animate if move was valid
+    if (!data.message.includes('❌') && cardRect) {
+      setFlyingCardData(card);
+      setFlyingCard(cardRect);
+      setTimeout(() => {
+        setFlyingCard(null);
+        setFlyingCardData(null);
+      }, 400);
+    }
+
+    if (data.message.includes('❌')) {
+      playSound('invalid');
+    }
+
+    // Play sounds based on result
     if (data.status === 'finished') playSound('win');
     else if (data.playerHand?.length === 1) playSound('uno');
   }
@@ -590,7 +605,7 @@ if (screen === 'name') return (
           </p>
           <CardBack />
         </div>
-        <div style={{ textAlign: 'center' }}>
+        <div style={{ textAlign: 'center' }} id="discard-pile">
           <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: 12, margin: '0 0 6px' }}>
             Discard
           </p>
@@ -746,6 +761,30 @@ if (screen === 'name') return (
         )}
       </div>
 
+      {/* Flying card animation */}
+      {flyingCard && flyingCardData && (
+      <div style={{
+        position: 'fixed',
+        top: flyingCard.startY,
+        left: flyingCard.startX,
+        width: 72, height: 108,
+        borderRadius: 10,
+        border: '3px solid white',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        pointerEvents: 'none',
+        zIndex: 999,
+        background: getCardColor(flyingCardData)
+          ?? 'linear-gradient(135deg, #e74c3c 25%, #2980b9 25%, #2980b9 50%, #27ae60 50%, #27ae60 75%, #f39c12 75%)',
+        animation: 'flyToDiscard 0.35s ease-in forwards',
+        '--fly-x': `${flyingCard.endX}px`,
+        '--fly-y': `${flyingCard.endY}px`,
+      }}>
+        <span style={{ fontSize: 24, fontWeight: 900, color: 'white' }}>
+          {getCardLabel(flyingCardData)}
+        </span>
+      </div>
+    )}
+      
     </div>
   </div>
   );
