@@ -287,34 +287,51 @@ export default function App() {
   const isFinished = game.status === "finished";
 
   return (
-    <div style={{
-      minHeight: '100vh',
-      background: '#1a6b3a',
-      padding: 24,
-      fontFamily: 'sans-serif'
-    }}>
+      <div style={{
+        height: '100vh',
+        maxWidth: 600,               // ← locks game width
+        margin: '0 auto',            // ← centres it on wide screens
+        background: '#1a6b3a',
+        padding: 24,
+        fontFamily: 'sans-serif',
+        display: 'flex',
+        flexDirection: 'column',
+        boxSizing: 'border-box',
+        overflow: 'hidden'
+      }}>
 
-      {/* CPU area */}
-      <div style={{ textAlign: 'center', marginBottom: 16 }}>
+      {/* CPU area — fixed height, fixed width, wraps inside */}
+      <div style={{ height: 100, textAlign: 'center', marginBottom: 8 }}>
         <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: 13, margin: '0 0 8px' }}>
           CPU — {game.cpuHand.length} cards
         </p>
-        <div style={{ display: 'flex', justifyContent: 'center', gap: 4 }}>
+        <div style={{
+          display: 'flex',
+          justifyContent: 'center',
+          flexWrap: 'wrap',          // ← wraps to next line instead of expanding
+          gap: 4,
+          maxWidth: '100%',          // ← never wider than screen
+          overflow: 'hidden',        // ← hides anything that overflows
+          maxHeight: 68,             // ← clips to fixed height
+        }}>
           {game.cpuHand.map((_, i) => <CardBack key={i} small />)}
         </div>
       </div>
 
-      {/* Message bar */}
+      {/* Message bar — fixed height */}
       <div style={{
+        height: 40,
         background: 'rgba(0,0,0,0.3)', borderRadius: 8,
-        padding: '8px 16px', color: 'white',
-        fontSize: 14, textAlign: 'center', margin: '12px 0'
+        padding: '0 16px', color: 'white',
+        fontSize: 14, textAlign: 'center',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        margin: '8px 0', flexShrink: 0
       }}>
         {game.message}
       </div>
 
-      {/* Turn indicator */}
-      <div style={{ textAlign: 'center', marginBottom: 12 }}>
+      {/* Turn indicator — fixed height */}
+      <div style={{ height: 32, textAlign: 'center', marginBottom: 8, flexShrink: 0 }}>
         <span style={{
           background: game.currentTurn === 'player' ? '#27ae60' : '#e74c3c',
           color: 'white', borderRadius: 20,
@@ -324,64 +341,78 @@ export default function App() {
         </span>
       </div>
 
-      {/* Discard + Deck */}
+      {/* Discard + Deck — fixed height */}
       <div style={{
+        height: 160,
         display: 'flex', justifyContent: 'center',
-        alignItems: 'center', gap: 32, margin: '16px 0'
+        alignItems: 'center', gap: 32,
+        flexShrink: 0
       }}>
         <div style={{ textAlign: 'center' }}>
-          <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: 12, margin: '0 0 6px' }}>Deck ({game.deck.length})</p>
+          <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: 12, margin: '0 0 6px' }}>
+            Deck ({game.deck.length})
+          </p>
           <CardBack />
         </div>
         <div style={{ textAlign: 'center' }}>
-          <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: 12, margin: '0 0 6px' }}>Discard</p>
+          <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: 12, margin: '0 0 6px' }}>
+            Discard
+          </p>
           {game.topCard && <UnoCard card={game.topCard} />}
         </div>
       </div>
 
-      {/* Color picker */}
-      <div style={{ textAlign: 'center', margin: '12px 0' }}>
-        <span style={{ color: 'rgba(255,255,255,0.7)', fontSize: 12 }}>Wild color: </span>
-        {COLORS.map(color => (
-          <button key={color} onClick={() => setChosenColor(color)} style={{
-            marginLeft: 6, padding: '4px 12px',
-            background: chosenColor === color
-              ? CARD_COLORS[color] : 'rgba(255,255,255,0.15)',
-            color: 'white', border: '2px solid white',
-            borderRadius: 6, cursor: 'pointer', fontSize: 12
-          }}>
-            {color}
-          </button>
-        ))}
+      {/* Color picker — fixed height */}
+        <div style={{ height: 36, textAlign: 'center', flexShrink: 0 }}>
+          <span style={{ color: 'rgba(255,255,255,0.7)', fontSize: 12 }}>Wild color: </span>
+          {COLORS.map(color => (
+            <button key={color} onClick={() => setChosenColor(color)} style={{
+              marginLeft: 6, padding: '4px 12px',
+              background: chosenColor === color
+                ? CARD_COLORS[color] : 'rgba(255,255,255,0.15)',
+              color: 'white', border: '2px solid white',
+              borderRadius: 6, cursor: 'pointer', fontSize: 12
+            }}>
+              {color}
+            </button>
+          ))}
       </div>
 
-      {/* UNO warning */}
-      {game.playerHand.length === 1 && !game.unoCalled && (
-        <div style={{
-          background: 'rgba(255,165,0,0.3)',
-          border: '2px solid orange', borderRadius: 8,
-          padding: '10px 16px', margin: '8px 0',
-          display: 'flex', alignItems: 'center',
-          justifyContent: 'center', gap: 16
-        }}>
-          <span style={{ color: 'white', fontSize: 14 }}>1 card left!</span>
-          <button onClick={callUno} style={{
-            background: '#e74c3c', color: 'white', border: 'none',
-            borderRadius: 6, padding: '6px 20px',
-            fontSize: 18, fontWeight: 900,
-            fontStyle: 'italic', cursor: 'pointer'
-          }}>UNO!</button>
-        </div>
-      )}
+      {/* UNO warning — fixed height (always rendered, just invisible when not needed) */}
+      <div style={{
+        height: 52, flexShrink: 0,
+        display: 'flex', alignItems: 'center', justifyContent: 'center'
+      }}>
+        {game.playerHand.length === 1 && !game.unoCalled && (
+          <div style={{
+            background: 'rgba(255,165,0,0.3)',
+            border: '2px solid orange', borderRadius: 8,
+            padding: '8px 16px', width: '100%', maxWidth: 300,
+            display: 'flex', alignItems: 'center',
+            justifyContent: 'center', gap: 16
+          }}>
+            <span style={{ color: 'white', fontSize: 14 }}>1 card left!</span>
+            <button onClick={callUno} style={{
+              background: '#e74c3c', color: 'white', border: 'none',
+              borderRadius: 6, padding: '6px 20px',
+              fontSize: 18, fontWeight: 900,
+              fontStyle: 'italic', cursor: 'pointer'
+            }}>UNO!</button>
+          </div>
+        )}
+      </div>
 
-      {/* Player hand */}
-      <div style={{ textAlign: 'center', marginTop: 16 }}>
+      {/* Player hand — takes remaining space, scrolls horizontally if needed */}
+      <div style={{ flex: 1, textAlign: 'center', overflow: 'hidden' }}>
         <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: 13, margin: '0 0 8px' }}>
           Your hand — {game.playerHand.length} cards
         </p>
         <div style={{
           display: 'flex', justifyContent: 'center',
-          flexWrap: 'wrap', gap: 8
+          flexWrap: 'wrap', gap: 8,
+          maxHeight: 'calc(100% - 24px)',
+          overflowY: 'auto',          // ← cards scroll inside fixed zone
+          padding: '4px 0 8px'
         }}>
           {game.playerHand.map((card, i) => (
             <UnoCard
@@ -393,8 +424,8 @@ export default function App() {
         </div>
       </div>
 
-      {/* Actions */}
-      <div style={{ textAlign: 'center', marginTop: 20 }}>
+      {/* Actions — fixed height at bottom */}
+      <div style={{ height: 60, textAlign: 'center', flexShrink: 0, paddingTop: 8 }}>
         {!isFinished && (
           <button onClick={drawCard} disabled={loading} style={{
             background: 'rgba(255,255,255,0.2)',
@@ -422,6 +453,7 @@ export default function App() {
           </div>
         )}
       </div>
+
     </div>
   );
 }
