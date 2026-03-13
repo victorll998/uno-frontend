@@ -128,6 +128,7 @@ export default function App() {
   const [chosenColor, setChosenColor] = useState("Red");
   const [playerName, setPlayerName] = useState("");
   const [scores, setScores] = useState([]);
+  const [pendingWild, setPendingWild] = useState(null); // stores index of wild card clicked
 
   // ─── API Calls ───────────────────────────────────────────────
   async function startGame() {
@@ -174,6 +175,38 @@ export default function App() {
     const res = await fetch(`${API}/scores/all`);
     setScores(await res.json());
     setScreen("leaderboard");
+    setLoading(false);
+  }
+
+  async function playCard(cardIndex) {
+    const card = game.playerHand[cardIndex];
+
+    // If it's a Wild, show color picker first
+    if (card.startsWith('Wild')) {
+      setPendingWild(cardIndex);
+      return;
+    }
+
+    // Normal card — play immediately
+    setLoading(true);
+    const res = await fetch(
+      `${API}/${game.gameId}/play?cardIndex=${cardIndex}&chosenColor=${chosenColor}`,
+      { method: 'POST' }
+    );
+    setGame(await res.json());
+    setLoading(false);
+  }
+
+  // Called after player picks a color for their Wild
+  async function confirmWild(color) {
+    setChosenColor(color);
+    setPendingWild(null);
+    setLoading(true);
+    const res = await fetch(
+      `${API}/${game.gameId}/play?cardIndex=${pendingWild}&chosenColor=${color}`,
+      { method: 'POST' }
+    );
+    setGame(await res.json());
     setLoading(false);
   }
 
@@ -356,22 +389,6 @@ export default function App() {
         </div>
       </div>
 
-      {/* Color picker */}
-      <div style={{ flex: '0 0 auto', textAlign: 'center', margin: '8px 0' }}>
-        <span style={{ color: 'rgba(255,255,255,0.7)', fontSize: 12 }}>Wild color: </span>
-        {COLORS.map(color => (
-          <button key={color} onClick={() => setChosenColor(color)} style={{
-            marginLeft: 6, padding: '4px 12px',
-            background: chosenColor === color
-              ? CARD_COLORS[color] : 'rgba(255,255,255,0.15)',
-            color: 'white', border: '2px solid white',
-            borderRadius: 6, cursor: 'pointer', fontSize: 12
-          }}>
-            {color}
-          </button>
-        ))}
-      </div>
-
       {/* UNO warning */}
       {game.playerHand.length === 1 && !game.unoCalled && (
         <div style={{
@@ -402,6 +419,62 @@ export default function App() {
           textAlign: 'center', color: 'white', fontSize: 14
         }}>
           UNO called! Play your last card to win!
+        </div>
+      )}
+
+
+      {/* Wild color picker popup */}
+      {pendingWild !== null && (
+        <div style={{
+          position: 'fixed',
+          top: 0, left: 0, right: 0, bottom: 0,
+          background: 'rgba(0,0,0,0.6)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 100
+        }}>
+          <div style={{
+            background: '#1a6b3a',
+            border: '3px solid white',
+            borderRadius: 16,
+            padding: 32,
+            textAlign: 'center'
+          }}>
+            <p style={{ color: 'white', fontSize: 18, fontWeight: 500, margin: '0 0 20px' }}>
+              Choose a color
+            </p>
+            <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
+              {COLORS.map(color => (
+                <div
+                  key={color}
+                  onClick={() => confirmWild(color)}
+                  style={{
+                    width: 64, height: 64,
+                    borderRadius: '50%',
+                    background: CARD_COLORS[color],
+                    border: '3px solid white',
+                    cursor: 'pointer',
+                    transition: 'transform 0.15s',
+                  }}
+                  onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.15)'}
+                  onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}
+                />
+              ))}
+            </div>
+            <button
+              onClick={() => setPendingWild(null)}
+              style={{
+                marginTop: 20, background: 'transparent',
+                border: '1px solid rgba(255,255,255,0.4)',
+                color: 'rgba(255,255,255,0.7)',
+                borderRadius: 8, padding: '6px 16px',
+                cursor: 'pointer', fontSize: 13
+              }}
+            >
+              Cancel
+            </button>
+          </div>
         </div>
       )}
 
