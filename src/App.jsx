@@ -30,6 +30,7 @@ function UnoCard({ card, onClick, small }) {
   const isWild = !bg;
   const w = small ? 44 : 72;
   const h = small ? 64 : 108;
+  const playSound = useSound();
 
   const wildStyle = {
     background: 'linear-gradient(135deg, #e74c3c 25%, #2980b9 25%, #2980b9 50%, #27ae60 50%, #27ae60 75%, #f39c12 75%)'
@@ -37,7 +38,7 @@ function UnoCard({ card, onClick, small }) {
 
   return (
     <div
-      onClick={onClick}
+      onClick={(e) => onClick && onClick(e)}
       style={{
         width: w, height: h,
         borderRadius: 10,
@@ -115,6 +116,74 @@ function CardBack({ small }) {
 }
 
 
+// Simple sound generator using Web Audio API — no files needed
+function useSound() {
+  const playSound = (type) => {
+    try {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+
+      if (type === 'play') {
+        // Pleasant card play sound
+        osc.frequency.setValueAtTime(523, ctx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(784, ctx.currentTime + 0.1);
+        gain.gain.setValueAtTime(0.3, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.3);
+        osc.start(ctx.currentTime);
+        osc.stop(ctx.currentTime + 0.3);
+
+      } else if (type === 'draw') {
+        // Soft draw sound
+        osc.frequency.setValueAtTime(300, ctx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(200, ctx.currentTime + 0.15);
+        gain.gain.setValueAtTime(0.2, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.2);
+        osc.start(ctx.currentTime);
+        osc.stop(ctx.currentTime + 0.2);
+
+      } else if (type === 'invalid') {
+        // Buzzer for invalid move
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(150, ctx.currentTime);
+        gain.gain.setValueAtTime(0.2, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.3);
+        osc.start(ctx.currentTime);
+        osc.stop(ctx.currentTime + 0.3);
+
+      } else if (type === 'uno') {
+        // Exciting UNO sound
+        osc.frequency.setValueAtTime(400, ctx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(800, ctx.currentTime + 0.15);
+        osc.frequency.exponentialRampToValueAtTime(600, ctx.currentTime + 0.3);
+        gain.gain.setValueAtTime(0.4, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.4);
+        osc.start(ctx.currentTime);
+        osc.stop(ctx.currentTime + 0.4);
+
+      } else if (type === 'win') {
+        // Win fanfare
+        [523, 659, 784, 1047].forEach((freq, i) => {
+          const o = ctx.createOscillator();
+          const g = ctx.createGain();
+          o.connect(g); g.connect(ctx.destination);
+          o.frequency.value = freq;
+          g.gain.setValueAtTime(0.3, ctx.currentTime + i * 0.12);
+          g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + i * 0.12 + 0.3);
+          o.start(ctx.currentTime + i * 0.12);
+          o.stop(ctx.currentTime + i * 0.12 + 0.3);
+        });
+      }
+    } catch(e) {
+      // Silently fail if audio not supported
+    }
+  };
+  return playSound;
+}
+
+
 // ─── Screens ─────────────────────────────────────────────────
 // "name"        → enter your name
 // "lobby"       → welcome + start game or view leaderboard
@@ -129,6 +198,7 @@ export default function App() {
   const [playerName, setPlayerName] = useState("");
   const [scores, setScores] = useState([]);
   const [pendingWild, setPendingWild] = useState(null); // stores index of wild card clicked
+  const [flyingCard, setFlyingCard] = useState(null); // { index, x, y }
 
   // ─── API Calls ───────────────────────────────────────────────
   async function startGame() {
@@ -140,29 +210,61 @@ export default function App() {
   }
 
   async function drawCard() {
+    playSound('draw');
     setLoading(true);
-    const res = await fetch(`${API}/${game.gameId}/draw`, { method: "POST" });
+    const res = await fetch(`${API}/${game.gameId}/draw`, { method: 'POST' });
     setGame(await res.json());
     setLoading(false);
   }
 
-  async function playCard(cardIndex) {
+  async function playCard(cardIndex, e) {
+    const card = game.playerHand[cardIndex];
+
+    // Intercept Wild cards
+    if (card.startsWith('Wild')) {
+      playSound('play');
+      setPendingWild(cardIndex);
+      return;
+    }
+
+    // Get card position for fly animation
+    if (e) {
+      const rect = e.currentTarget.getBoundingClientRect();
+      const discardEl = document.getElementById('discard-pile');
+      const discardRect = discardEl?.getBoundingClientRect();
+      if (discardRect) {
+        setFlyingCard({
+          index: cardIndex,
+          startX: rect.left, startY: rect.top,
+          endX: discardRect.left - rect.left,
+          endY: discardRect.top - rect.top,
+        });
+        setTimeout(() => setFlyingCard(null), 400);
+      }
+    }
+
+    playSound('play');
     setLoading(true);
     const res = await fetch(
       `${API}/${game.gameId}/play?cardIndex=${cardIndex}&chosenColor=${chosenColor}`,
-      { method: "POST" }
+      { method: 'POST' }
     );
-    setGame(await res.json());
+    const data = await res.json();
+    setGame(data);
     setLoading(false);
+
+    // Trigger sounds based on result
+    if (data.status === 'finished') playSound('win');
+    else if (data.playerHand?.length === 1) playSound('uno');
   }
 
   async function callUno() {
+    playSound('uno');
     setLoading(true);
-    const res = await fetch(`${API}/${game.gameId}/uno`, { method: "POST" });
+    const res = await fetch(`${API}/${game.gameId}/uno`, { method: 'POST' });
     setGame(await res.json());
     setLoading(false);
   }
-
   async function finishGame() {
     await fetch(
       `${API}/${game.gameId}/finish?playerName=${playerName}`,
@@ -210,55 +312,168 @@ export default function App() {
     setLoading(false);
   }
 
-  // ─── Screen: Name Entry ──────────────────────────────────────
-  if (screen === "name") return (
-    <div style={styles.container}>
-      <h1 style={styles.title}>🃏 Uno</h1>
-      <h2>Enter your name to play</h2>
-      <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
-        <input
-          type="text"
-          placeholder="Your name..."
-          value={playerName}
-          onChange={(e) => setPlayerName(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter"
-            && playerName.trim() && setScreen("lobby")}
-          style={styles.input}
-        />
-        <button
-          onClick={() => setScreen("lobby")}
-          disabled={playerName.trim() === ""}
-          style={styles.button}
-        >
-          Continue →
-        </button>
-      </div>
-    </div>
-  );
+if (screen === 'name') return (
+  <div style={{
+    minHeight: '100vh', width: '100%',
+    background: '#1a6b3a',
+    display: 'flex', flexDirection: 'column',
+    alignItems: 'center', justifyContent: 'center',
+    fontFamily: "'Nunito', sans-serif",
+    position: 'relative', overflow: 'hidden'
+  }}>
 
-  // ─── Screen: Lobby ───────────────────────────────────────────
-  if (screen === "lobby") return (
-    <div style={styles.container}>
-      <h1 style={styles.title}>🃏 Uno</h1>
-      <p style={{ fontSize: 18 }}>
-        Welcome, <strong>{playerName}</strong>! 👋
+    {/* Floating background cards */}
+    {[
+      { bg: '#e74c3c', top: '10%', left: '5%',  r: '-15deg', delay: '0s',   w: 60, h: 84 },
+      { bg: '#2980b9', top: '20%', right: '8%', r: '12deg',  delay: '1s',   w: 48, h: 68 },
+      { bg: '#f39c12', bottom: '15%', left: '10%', r: '8deg', delay: '2s',  w: 56, h: 78 },
+      { bg: '#27ae60', bottom: '20%', right: '6%', r: '-10deg', delay: '0.5s', w: 44, h: 62 },
+    ].map((c, i) => (
+      <div key={i} style={{
+        position: 'absolute', borderRadius: 10,
+        border: '3px solid white', opacity: 0.15,
+        width: c.w, height: c.h, background: c.bg,
+        top: c.top, left: c.left, right: c.right, bottom: c.bottom,
+        animation: `float 6s ease-in-out ${c.delay} infinite`,
+        '--r': c.r,
+      }} />
+    ))}
+
+    {/* UNO letter cards */}
+    <div style={{ display: 'flex', gap: 12, marginBottom: 24 }}>
+      {[
+        { letter: 'U', bg: '#e74c3c', delay: '0.1s', r: '-6deg' },
+        { letter: 'N', bg: '#2980b9', delay: '0.2s', r: '3deg'  },
+        { letter: 'O', bg: '#27ae60', delay: '0.3s', r: '-4deg' },
+        { letter: '!', bg: '#f39c12', delay: '0.4s', r: '6deg'  },
+      ].map((c, i) => (
+        <div key={i} style={{
+          width: 52, height: 72, borderRadius: 10,
+          border: '3px solid white', background: c.bg,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          fontFamily: "'Fredoka One', cursive",
+          fontSize: 26, color: 'white',
+          transform: `rotate(${c.r})`,
+          animation: `dealIn 0.4s ease-out ${c.delay} both`,
+        }}>
+          {c.letter}
+        </div>
+      ))}
+    </div>
+
+    <h1 style={{
+      fontFamily: "'Fredoka One', cursive",
+      fontSize: 72, color: 'white',
+      letterSpacing: 4, margin: '0 0 4px',
+      textShadow: '4px 4px 0 rgba(0,0,0,0.2)'
+    }}>
+      UNO<span style={{ color: '#f39c12' }}>!</span>
+    </h1>
+
+    <p style={{
+      color: 'rgba(255,255,255,0.7)', fontSize: 14,
+      fontWeight: 600, letterSpacing: 4,
+      textTransform: 'uppercase', margin: '0 0 40px'
+    }}>
+      Card Game
+    </p>
+
+    <input
+      type="text"
+      placeholder="Enter your name..."
+      value={playerName}
+      onChange={(e) => setPlayerName(e.target.value)}
+      onKeyDown={(e) => e.key === 'Enter' && playerName.trim() && setScreen('lobby')}
+      style={{
+        width: 280, padding: '14px 20px',
+        borderRadius: 40, border: '3px solid rgba(255,255,255,0.4)',
+        background: 'rgba(255,255,255,0.15)',
+        color: 'white', fontSize: 18,
+        fontFamily: "'Nunito', sans-serif", fontWeight: 600,
+        textAlign: 'center', outline: 'none', marginBottom: 16,
+      }}
+    />
+
+    <button
+      onClick={() => setScreen('lobby')}
+      disabled={playerName.trim() === ''}
+      style={{
+        width: 280, padding: 14, borderRadius: 40,
+        border: 'none', background: '#f39c12',
+        color: 'white', fontSize: 20,
+        fontFamily: "'Fredoka One', cursive",
+        letterSpacing: 2, cursor: 'pointer',
+        boxShadow: '0 4px 0 #c47f10', marginBottom: 12,
+        opacity: playerName.trim() === '' ? 0.4 : 1,
+        transition: 'transform 0.15s',
+      }}
+      onMouseEnter={e => playerName.trim() && (e.currentTarget.style.transform = 'translateY(-2px)')}
+      onMouseLeave={e => e.currentTarget.style.transform = 'translateY(0)'}
+    >
+      PLAY
+    </button>
+  </div>
+);
+
+  // Lobby screen
+  if (screen === 'lobby') return (
+    <div style={{
+      minHeight: '100vh', width: '100%',
+      background: '#1a6b3a',
+      display: 'flex', flexDirection: 'column',
+      alignItems: 'center', justifyContent: 'center',
+      fontFamily: "'Nunito', sans-serif",
+    }}>
+      <h1 style={{
+        fontFamily: "'Fredoka One', cursive",
+        fontSize: 64, color: 'white',
+        letterSpacing: 4, margin: '0 0 8px',
+        textShadow: '4px 4px 0 rgba(0,0,0,0.2)'
+      }}>
+        UNO<span style={{ color: '#f39c12' }}>!</span>
+      </h1>
+
+      <p style={{
+        color: 'rgba(255,255,255,0.8)', fontSize: 18,
+        fontWeight: 600, margin: '0 0 40px'
+      }}>
+        Welcome back, <span style={{ color: '#f39c12' }}>{playerName}</span>!
       </p>
-      <div style={{ display: "flex", gap: 12, marginTop: 24 }}>
-        <button
-          onClick={startGame}
-          disabled={loading}
-          style={styles.button}
-        >
-          {loading ? "Starting..." : "🎮 Start New Game"}
-        </button>
-        <button
-          onClick={loadLeaderboard}
-          disabled={loading}
-          style={{ ...styles.button, background: "#6c757d" }}
-        >
-          🏆 Leaderboard
-        </button>
-      </div>
+
+      <button
+        onClick={startGame}
+        disabled={loading}
+        style={{
+          width: 280, padding: 16, borderRadius: 40,
+          border: 'none', background: '#f39c12',
+          color: 'white', fontSize: 22,
+          fontFamily: "'Fredoka One', cursive",
+          letterSpacing: 2, cursor: 'pointer',
+          boxShadow: '0 4px 0 #c47f10', marginBottom: 16,
+          transition: 'transform 0.15s',
+        }}
+        onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-2px)'}
+        onMouseLeave={e => e.currentTarget.style.transform = 'translateY(0)'}
+      >
+        {loading ? 'DEALING...' : 'PLAY'}
+      </button>
+
+      <button
+        onClick={loadLeaderboard}
+        disabled={loading}
+        style={{
+          width: 280, padding: 14, borderRadius: 40,
+          background: 'transparent',
+          border: '2px solid rgba(255,255,255,0.4)',
+          color: 'rgba(255,255,255,0.8)', fontSize: 16,
+          fontFamily: "'Nunito', sans-serif", fontWeight: 600,
+          cursor: 'pointer', transition: 'border 0.2s, color 0.2s',
+        }}
+        onMouseEnter={e => { e.currentTarget.style.borderColor = 'white'; e.currentTarget.style.color = 'white'; }}
+        onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.4)'; e.currentTarget.style.color = 'rgba(255,255,255,0.8)'; }}
+      >
+        🏆 Leaderboard
+      </button>
     </div>
   );
 
@@ -491,7 +706,7 @@ export default function App() {
             <UnoCard
               key={i}
               card={card}
-              onClick={() => !loading && !isFinished && playCard(i)}
+              onClick={(e) => !loading && !isFinished && playCard(i, e)}
             />
           ))}
         </div>
