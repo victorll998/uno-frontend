@@ -393,6 +393,19 @@ if (screen === 'name') return (
     >
       PLAY
     </button>
+
+    <p style={{
+      position: 'absolute',
+      bottom: 20,
+      color: 'rgba(255,255,255,0.4)',
+      fontSize: 13,
+      fontFamily: "'Nunito', sans-serif",
+      fontWeight: 600,
+      letterSpacing: 1,
+      margin: 0,
+    }}>
+      Created by Victor Lu
+    </p>
   </div>
 );
 
