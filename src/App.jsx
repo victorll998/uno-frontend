@@ -30,7 +30,6 @@ function UnoCard({ card, onClick, small }) {
   const isWild = !bg;
   const w = small ? 44 : 72;
   const h = small ? 64 : 108;
-  const playSound = useSound();
 
   const wildStyle = {
     background: 'linear-gradient(135deg, #e74c3c 25%, #2980b9 25%, #2980b9 50%, #27ae60 50%, #27ae60 75%, #f39c12 75%)'
@@ -199,6 +198,7 @@ export default function App() {
   const [scores, setScores] = useState([]);
   const [pendingWild, setPendingWild] = useState(null); // stores index of wild card clicked
   const [flyingCard, setFlyingCard] = useState(null); // { index, x, y }
+  const playSound = useSound();
 
   // ─── API Calls ───────────────────────────────────────────────
   async function startGame() {
@@ -277,25 +277,6 @@ export default function App() {
     const res = await fetch(`${API}/scores/all`);
     setScores(await res.json());
     setScreen("leaderboard");
-    setLoading(false);
-  }
-
-  async function playCard(cardIndex) {
-    const card = game.playerHand[cardIndex];
-
-    // If it's a Wild, show color picker first
-    if (card.startsWith('Wild')) {
-      setPendingWild(cardIndex);
-      return;
-    }
-
-    // Normal card — play immediately
-    setLoading(true);
-    const res = await fetch(
-      `${API}/${game.gameId}/play?cardIndex=${cardIndex}&chosenColor=${chosenColor}`,
-      { method: 'POST' }
-    );
-    setGame(await res.json());
     setLoading(false);
   }
 
