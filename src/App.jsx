@@ -2,6 +2,118 @@ import { useState, useEffect } from "react";
 
 const API = import.meta.env.VITE_API_URL || "http://localhost:8080/api/game";
 const COLORS = ["Red", "Green", "Blue", "Yellow"];
+const CARD_COLORS = {
+  Red: '#e74c3c', Blue: '#2980b9',
+  Green: '#27ae60', Yellow: '#f39c12'
+};
+
+function getCardLabel(card) {
+  if (card.includes('Skip')) return 'S';
+  if (card.includes('Reverse')) return 'R';
+  if (card.includes('Draw Two')) return '+2';
+  if (card === 'Wild Draw Four') return '+4';
+  if (card === 'Wild') return 'W';
+  return card.split(' ')[1] ?? card;
+}
+
+function getCardColor(card) {
+  if (card.startsWith('Red')) return '#e74c3c';
+  if (card.startsWith('Blue')) return '#2980b9';
+  if (card.startsWith('Green')) return '#27ae60';
+  if (card.startsWith('Yellow')) return '#f39c12';
+  return null; // Wild
+}
+
+function UnoCard({ card, onClick, small }) {
+  const bg = getCardColor(card);
+  const label = getCardLabel(card);
+  const isWild = !bg;
+  const w = small ? 44 : 72;
+  const h = small ? 64 : 108;
+
+  const wildStyle = {
+    background: 'linear-gradient(135deg, #e74c3c 25%, #2980b9 25%, #2980b9 50%, #27ae60 50%, #27ae60 75%, #f39c12 75%)'
+  };
+
+  return (
+    <div
+      onClick={onClick}
+      style={{
+        width: w, height: h,
+        borderRadius: 10,
+        border: '3px solid white',
+        display: 'flex', flexDirection: 'column',
+        alignItems: 'center', justifyContent: 'center',
+        position: 'relative',
+        cursor: onClick ? 'pointer' : 'default',
+        transition: 'transform 0.15s, box-shadow 0.15s',
+        flexShrink: 0,
+        ...(isWild ? wildStyle : { background: bg })
+      }}
+      onMouseEnter={e => {
+        if (onClick) {
+          e.currentTarget.style.transform = 'translateY(-12px)';
+          e.currentTarget.style.boxShadow = '0 8px 20px rgba(0,0,0,0.4)';
+        }
+      }}
+      onMouseLeave={e => {
+        e.currentTarget.style.transform = 'translateY(0)';
+        e.currentTarget.style.boxShadow = 'none';
+      }}
+    >
+      {!small && (
+        <span style={{
+          position: 'absolute', top: 6, left: 8,
+          fontSize: 13, fontWeight: 700, color: 'white'
+        }}>{label}</span>
+      )}
+      <div style={{
+        width: small ? 30 : 48, height: small ? 44 : 72,
+        borderRadius: '50%',
+        border: '2px solid rgba(255,255,255,0.5)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        background: 'rgba(255,255,255,0.15)'
+      }}>
+        <span style={{
+          fontSize: small ? 14 : 26,
+          fontWeight: 900, color: 'white',
+          textShadow: '1px 1px 3px rgba(0,0,0,0.3)'
+        }}>{label}</span>
+      </div>
+      {!small && (
+        <span style={{
+          position: 'absolute', bottom: 6, right: 8,
+          fontSize: 13, fontWeight: 700, color: 'white',
+          transform: 'rotate(180deg)'
+        }}>{label}</span>
+      )}
+    </div>
+  );
+}
+
+function CardBack({ small }) {
+  return (
+    <div style={{
+      width: small ? 44 : 72, height: small ? 64 : 108,
+      borderRadius: 10, border: '3px solid white',
+      background: '#c0392b',
+      display: 'flex', alignItems: 'center', justifyContent: 'center'
+    }}>
+      <div style={{
+        width: small ? 34 : 58, height: small ? 54 : 94,
+        borderRadius: 6, border: '2px solid rgba(255,255,255,0.3)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        background: 'repeating-linear-gradient(45deg, rgba(255,255,255,0.1) 0px, rgba(255,255,255,0.1) 2px, transparent 2px, transparent 8px)'
+      }}>
+        <span style={{
+          fontSize: small ? 11 : 18, fontWeight: 900,
+          color: 'white', fontStyle: 'italic'
+        }}>UNO</span>
+      </div>
+    </div>
+  );
+}
+
 
 // ─── Screens ─────────────────────────────────────────────────
 // "name"        → enter your name
@@ -175,42 +287,69 @@ export default function App() {
   const isFinished = game.status === "finished";
 
   return (
-    <div style={styles.container}>
-      <h1 style={styles.title}>🃏 Uno</h1>
-      <p>Playing as: <strong>{playerName}</strong></p>
+    <div style={{
+      minHeight: '100vh',
+      background: '#1a6b3a',
+      padding: 24,
+      fontFamily: 'sans-serif'
+    }}>
 
-      {/* Message */}
-      <p style={{ fontSize: 18, fontWeight: "bold" }}>{game.message}</p>
+      {/* CPU area */}
+      <div style={{ textAlign: 'center', marginBottom: 16 }}>
+        <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: 13, margin: '0 0 8px' }}>
+          CPU — {game.cpuHand.length} cards
+        </p>
+        <div style={{ display: 'flex', justifyContent: 'center', gap: 4 }}>
+          {game.cpuHand.map((_, i) => <CardBack key={i} small />)}
+        </div>
+      </div>
+
+      {/* Message bar */}
+      <div style={{
+        background: 'rgba(0,0,0,0.3)', borderRadius: 8,
+        padding: '8px 16px', color: 'white',
+        fontSize: 14, textAlign: 'center', margin: '12px 0'
+      }}>
+        {game.message}
+      </div>
 
       {/* Turn indicator */}
-      <p style={{ color: game.currentTurn === "player" ? "green" : "red" }}>
-        {game.currentTurn === "player" ? "⬆️ Your turn" : "⏳ CPU's turn"}
-      </p>
+      <div style={{ textAlign: 'center', marginBottom: 12 }}>
+        <span style={{
+          background: game.currentTurn === 'player' ? '#27ae60' : '#e74c3c',
+          color: 'white', borderRadius: 20,
+          padding: '4px 16px', fontSize: 13, fontWeight: 500
+        }}>
+          {game.currentTurn === 'player' ? 'Your turn' : "CPU's turn"}
+        </span>
+      </div>
 
-      {/* CPU hand */}
-      <h2>🤖 CPU Hand</h2>
-      <p>{game.cpuHand.length} cards remaining</p>
-
-      {/* Discard pile */}
-      <h2>Discard Pile</h2>
-      <div style={styles.card}>{game.topCard ?? "Empty"}</div>
+      {/* Discard + Deck */}
+      <div style={{
+        display: 'flex', justifyContent: 'center',
+        alignItems: 'center', gap: 32, margin: '16px 0'
+      }}>
+        <div style={{ textAlign: 'center' }}>
+          <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: 12, margin: '0 0 6px' }}>Deck ({game.deck.length})</p>
+          <CardBack />
+        </div>
+        <div style={{ textAlign: 'center' }}>
+          <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: 12, margin: '0 0 6px' }}>Discard</p>
+          {game.topCard && <UnoCard card={game.topCard} />}
+        </div>
+      </div>
 
       {/* Color picker */}
-      <div style={{ margin: "16px 0" }}>
-        <strong>Choose color for Wild: </strong>
+      <div style={{ textAlign: 'center', margin: '12px 0' }}>
+        <span style={{ color: 'rgba(255,255,255,0.7)', fontSize: 12 }}>Wild color: </span>
         {COLORS.map(color => (
-          <button
-            key={color}
-            onClick={() => setChosenColor(color)}
-            style={{
-              marginRight: 8, padding: "4px 12px",
-              background: chosenColor === color
-                ? color.toLowerCase() : "#eee",
-              color: chosenColor === color ? "white" : "black",
-              border: "1px solid #ccc",
-              borderRadius: 4, cursor: "pointer"
-            }}
-          >
+          <button key={color} onClick={() => setChosenColor(color)} style={{
+            marginLeft: 6, padding: '4px 12px',
+            background: chosenColor === color
+              ? CARD_COLORS[color] : 'rgba(255,255,255,0.15)',
+            color: 'white', border: '2px solid white',
+            borderRadius: 6, cursor: 'pointer', fontSize: 12
+          }}>
             {color}
           </button>
         ))}
@@ -218,72 +357,71 @@ export default function App() {
 
       {/* UNO warning */}
       {game.playerHand.length === 1 && !game.unoCalled && (
-        <div style={styles.unoWarning}>
-          <span style={{ fontSize: 18 }}>⚠️ You have 1 card left!</span>
-          <button onClick={callUno} disabled={loading} style={styles.unoButton}>
-            UNO!
-          </button>
-        </div>
-      )}
-
-      {/* UNO called */}
-      {game.unoCalled && game.playerHand.length === 1 && (
-        <div style={styles.unoSuccess}>
-          🗣️ UNO called! Play your last card to win!
+        <div style={{
+          background: 'rgba(255,165,0,0.3)',
+          border: '2px solid orange', borderRadius: 8,
+          padding: '10px 16px', margin: '8px 0',
+          display: 'flex', alignItems: 'center',
+          justifyContent: 'center', gap: 16
+        }}>
+          <span style={{ color: 'white', fontSize: 14 }}>1 card left!</span>
+          <button onClick={callUno} style={{
+            background: '#e74c3c', color: 'white', border: 'none',
+            borderRadius: 6, padding: '6px 20px',
+            fontSize: 18, fontWeight: 900,
+            fontStyle: 'italic', cursor: 'pointer'
+          }}>UNO!</button>
         </div>
       )}
 
       {/* Player hand */}
-      <h2>Your Hand ({game.playerHand.length} cards)</h2>
-      <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-        {game.playerHand.map((card, i) => (
-          <div
-            key={i}
-            onClick={() => !loading && !isFinished && playCard(i)}
-            style={{
-              ...styles.card,
-              cursor: isFinished ? "default" : "pointer",
-              opacity: loading ? 0.5 : 1
-            }}
-          >
-            {card}
-          </div>
-        ))}
+      <div style={{ textAlign: 'center', marginTop: 16 }}>
+        <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: 13, margin: '0 0 8px' }}>
+          Your hand — {game.playerHand.length} cards
+        </p>
+        <div style={{
+          display: 'flex', justifyContent: 'center',
+          flexWrap: 'wrap', gap: 8
+        }}>
+          {game.playerHand.map((card, i) => (
+            <UnoCard
+              key={i}
+              card={card}
+              onClick={() => !loading && !isFinished && playCard(i)}
+            />
+          ))}
+        </div>
       </div>
 
-      <br />
-      <p>Cards in deck: {game.deck.length} | Turn: {game.turnNumber}</p>
-
-      {!isFinished && (
-        <button onClick={drawCard} disabled={loading} style={styles.button}>
-          Draw a Card
-        </button>
-      )}
-
-      {/* Game over */}
-      {isFinished && (
-        <div style={{ marginTop: 16, display: "flex", gap: 12 }}>
-          <button
-            style={styles.button}
-            onClick={async () => {
-              await finishGame();   // save score
-              setGame(null);
-              setScreen("lobby");
-            }}
-          >
-            💾 Save Score & Back to Lobby
+      {/* Actions */}
+      <div style={{ textAlign: 'center', marginTop: 20 }}>
+        {!isFinished && (
+          <button onClick={drawCard} disabled={loading} style={{
+            background: 'rgba(255,255,255,0.2)',
+            border: '2px solid white', color: 'white',
+            borderRadius: 8, padding: '10px 24px',
+            fontSize: 15, cursor: 'pointer'
+          }}>
+            Draw a card
           </button>
-          <button
-            style={{ ...styles.button, background: "#28a745" }}
-            onClick={async () => {
-              await finishGame();   // save score
-              startGame();          // immediately start new game
-            }}
-          >
-            🔄 Save & Play Again
-          </button>
-        </div>
-      )}
+        )}
+        {isFinished && (
+          <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
+            <button style={{
+              background: '#2980b9', color: 'white', border: 'none',
+              borderRadius: 8, padding: '10px 20px', fontSize: 15, cursor: 'pointer'
+            }} onClick={async () => { await finishGame(); setGame(null); setScreen('lobby'); }}>
+              Save & Back to Lobby
+            </button>
+            <button style={{
+              background: '#27ae60', color: 'white', border: 'none',
+              borderRadius: 8, padding: '10px 20px', fontSize: 15, cursor: 'pointer'
+            }} onClick={async () => { await finishGame(); startGame(); }}>
+              Save & Play Again
+            </button>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
